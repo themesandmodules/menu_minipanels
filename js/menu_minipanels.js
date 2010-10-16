@@ -29,7 +29,7 @@ Drupal.behaviors.menuMiniPanels = function(context) {
   $('ul li a.menu-minipanel').each(function() {
     var matches = $(this).attr('class').match('menu-minipanel-([a-zA-Z\_]+)');
     var html = $('div.' + matches[1]).clone().show();
-    var settings = menu_minipanels_settings[matches[1]];
+    var settings = Drupal.settings.menuMinipanels.panels[matches[1]];
     settings['hide']['fixed'] = true;
     settings['content'] = html;
     $(this).qtip(settings);

@@ -43,7 +43,7 @@
 
 /**
  *
- * Implementation of hook_init().
+ * Implements hook_init().
  */
 function menu_minipanels_init() {
   // Add js + css
@@ -53,16 +53,11 @@ function menu_minipanels_init() {
     drupal_add_js($path . '/js/lib/jquery.qtip-1.0.0-rc3.min.js');
   }
   else {
-    drupal_set_message(t('Menu Minipanels module is enabled, but the qTip library has not been downloaded. This module will not work without qTip! Please see README.txt for instructuions on how to download qTip.'), 'error');
+    // Don't do anything more, there's no point as the module will not function without the qtip library
+    return;
   }
   drupal_add_css($path . '/css/menu_minipanels.css', 'module', 'all', TRUE);
-
-  // Initialize the settings array, in expectation of elements being added
-  // as minipanel menu items are detected. This is added to the footer, not the header
-  // to keep it close to the config elements that are added in the footer
-  $js_setup = 'var menu_minipanels_settings = new Array();';
-  drupal_add_js($js_setup, 'inline', 'footer', FALSE, TRUE, TRUE);
-
+  
   // Most themes will call primary and secondary links on every page.
   // They are usually themed by a function call inside page.tpl.php so we can't wait until theme_links is called,
   // because by that time, $closure has already been created, and therefore our code would not be included.
@@ -74,7 +69,7 @@ function menu_minipanels_init() {
 }
 
 /**
- * Implementation of hook_help().
+ * Implements hook_help().
  */
 function menu_minipanels_help($path, $arg) {
   switch ($path) {
@@ -84,7 +79,7 @@ function menu_minipanels_help($path, $arg) {
 }
 
 /**
- * Implementation of hook_menu().
+ * Implements hook_menu().
  */
 function menu_minipanels_menu() {
   $items = array();
@@ -110,7 +105,7 @@ function menu_minipanels_admin() {
 
 /**
  *
- * Implementation of hook_form_alter().
+ * Implements hook_form_alter().
  */
 function menu_minipanels_form_alter(&$form, $form_state, $form_id) {
   if ($form_id == 'menu_edit_item') {
@@ -150,13 +145,18 @@ function menu_minipanels_form_alter(&$form, $form_state, $form_id) {
 
       _menu_minipanels_hover_settings_form($form['menu']['options'], $form['menu']['#item']['options']['menu_minipanels_hover'], variable_get('menu_minipanels_hover', _menu_minipanels_hover_defaults()));
     }
+    
+    // This is prepended to the array to ensure it is executed before menu_edit_item_submit
+    // If it is executed after menu_edit_item_submit, then the menu_minipanels_hover
+    // array will be saved to the database anyway, and the intercept would be pointless.
+    array_unshift($form['#submit'], 'menu_minipanels_menu_edit_item_submit');
   }
 }
 
 /**
  * If no minipanel is set, stop minipanel settings being saved.
  */
-function menu_minipanels_menu_edit_item_validate($form, &$form_state) {
+function menu_minipanels_menu_edit_item_submit($form, &$form_state) {
   if ($form_state['values']['menu']['options']['minipanel'] == '') {
     unset($form_state['values']['menu']['options']['menu_minipanels_hover']);
   }
@@ -164,7 +164,7 @@ function menu_minipanels_menu_edit_item_validate($form, &$form_state) {
 
 /**
  *
- * Implementation of hook_theme_registry_alter().
+ * Implements hook_theme_registry_alter().
  *
  * Theme preprocess functions aren't called if the theme is in a function.
  *
@@ -248,7 +248,7 @@ function menu_minipanels_preprocess_menu_item_link($link) {
 }
 
 /**
- * Implementation of hook_footer().
+ * Implements hook_footer().
  *
  * Add all the required minipanel output to the closure.
  * See @_menu_minipanels_include
@@ -302,8 +302,15 @@ function _menu_minipanels_include($minipanel_name, $menu_config) {
     unset($menu_config['style']['tip']);
   }
 
-  $js = 'menu_minipanels_settings[\'' . $minipanel_name . '\'] = ' . drupal_to_js($menu_config) . ';';
-  drupal_add_js($js, 'inline', 'footer', FALSE, TRUE, TRUE);
+  $settings = array(
+    'menuMinipanels' => array(
+    	'panels' => array(
+        $minipanel_name => $menu_config
+      )
+    )
+  );
+  drupal_add_js($settings, 'setting');
+  
   $html = '<div class="menu-minipanels ' . $minipanel_name . '">' . _menu_minipanels_render_panel($minipanel_name) . '</div>';
   menu_minipanels_panels($html);
   return _menu_minipanels_link_class_name($minipanel_name);
@@ -339,30 +346,30 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   // Setting up select lists used in the config form
   // Used for both show and hide effect options
   $effect_options = array(
-    'false' => 'None',
-    'fade' => 'Fade',
-    'slide' => 'Slide',
-    'grow' => 'Grow'
+    'false' => t('None'),
+    'fade' => t('Fade'),
+    'slide' => t('Slide'),
+    'grow' => t('Grow')
   );
   // Used in many places
   $boolean_options = array(
-    'true' => 'True',
-    'false' => 'False'
+    'true' => t('True'),
+    'false' => t('False')
   );
   // Used in many places
   $options_tips = array(
-    'topLeft' => 'Top Left',
-    'topMiddle' => 'Top Middle',
-    'topRight' => 'Top Right',
-    'rightTop' => 'Right Top',
-    'rightMiddle' => 'Right Middle',
-    'rightBottom' => 'Right Bottom',
-    'bottomRight' => 'Bottom Right',
-    'bottomMiddle' => 'Bottom Middle',
-    'bottomLeft' => 'Bottom Left',
-    'leftBottom' => 'Left Bottom',
-    'leftMiddle' => 'Left Middle',
-    'leftTop' => 'Left Top',
+    'topLeft' => t('Top Left'),
+    'topMiddle' => t('Top Middle'),
+    'topRight' => t('Top Right'),
+    'rightTop' => t('Right Top'),
+    'rightMiddle' => t('Right Middle'),
+    'rightBottom' => t('Right Bottom'),
+    'bottomRight' => t('Bottom Right'),
+    'bottomMiddle' => t('Bottom Middle'),
+    'bottomLeft' => t('Bottom Left'),
+    'leftBottom' => t('Left Bottom'),
+    'leftMiddle' => t('Left Middle'),
+    'leftTop' => t('Left Top'),
   );
 
   // Make this a #tree structure, so that form data collapses nicely
@@ -384,23 +391,23 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   );
   $base_form['menu_minipanels_hover']['position'] = array();
   $target_options = array(
-    'element' => 'Element',
-    'mouse' => 'Mouse'
+    'element' => t('Element'),
+    'mouse' => t('Mouse')
   );
   $base_form['menu_minipanels_hover']['position']['target'] = array(
     '#type' => 'select',
     '#title' => t('Target'),
-    '#description' => t('Position the hover relative to what?'),
+    '#description' => t('The location the hover will appear relative to.'),
     '#default_value' => isset($menu_minipanels_hover['position']['target']) ? $menu_minipanels_hover['position']['target'] : $defaults['position']['target'],
     '#options' => $target_options,
     '#required' => FALSE,
   );
 
   $type_options = array(
-    'absolute' => 'Absolute',
-    'relative' => 'Fixed',
-    'static' => 'Relative',
-    'relative' => 'Static',
+    'absolute' => t('Absolute'),
+    'relative' => t('Fixed'),
+    'static' => t('Relative'),
+    'relative' => t('Static'),
   );
   $base_form['menu_minipanels_hover']['position']['type'] = array(
     '#type' => 'select',
@@ -439,22 +446,22 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['show']['delay'] = array(
     '#type' => 'textfield',
     '#title' => t('Delay'),
-    '#description' => t('How long in milliseconds, should the tooltip wait before showing?'),
+    '#description' => t('How long in milliseconds the tooltip should wait before showing.'),
     '#default_value' => isset($menu_minipanels_hover['show']['delay']) ? $menu_minipanels_hover['show']['delay'] : $defaults['show']['delay'],
     '#required' => FALSE,
   );
 
   $when_options = array(
-    'click' => 'Click',
-    'dblclick' => 'Double Click',
-    'mouseover' => 'Mouse Over',
-    'mouseenter' => 'Mouse Enter'
+    'click' => t('Click'),
+    'dblclick' => t('Double Click'),
+    'mouseover' => t('Mouse Over'),
+    'mouseenter' => t('Mouse Enter')
   );
   $base_form['menu_minipanels_hover']['show']['when'] = array();
   $base_form['menu_minipanels_hover']['show']['when']['event'] = array(
     '#type' => 'select',
     '#title' => t('Show Event'),
-    '#description' => t('When will the menu appear?'),
+    '#description' => t('When the menu should appear.'),
     '#default_value' => isset($menu_minipanels_hover['show']['when']['event']) ? $menu_minipanels_hover['show']['when']['event'] : $defaults['show']['when']['event'],
     '#options' => $when_options,
     '#required' => FALSE,
@@ -471,7 +478,7 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['show']['effect']['length'] = array(
     '#type' => 'textfield',
     '#title' => t('Length'),
-    '#description' => t('Length of the effect'),
+    '#description' => t('Length of the effect.'),
     '#default_value' => isset($menu_minipanels_hover['show']['effect']['length']) ? $menu_minipanels_hover['show']['effect']['length'] : $defaults['show']['effect']['length'],
     '#required' => FALSE,
   );
@@ -486,7 +493,7 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['hide']['fixed'] = array(
     '#type' => 'select',
     '#title' => t('Fixed'),
-    '#description' => t('Should the tooltip remain or dissapear?'),
+    '#description' => t('Should the tooltip remain or dissapear.'),
     '#default_value' => isset($menu_minipanels_hover['hide']['fixed']) ? $menu_minipanels_hover['hide']['fixed'] : $defaults['hide']['fixed'],
     '#options' => $boolean_options,
     '#required' => FALSE,
@@ -503,7 +510,7 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['hide']['effect']['length'] = array(
     '#type' => 'textfield',
     '#title' => t('Length'),
-    '#description' => t('Length of the effect'),
+    '#description' => t('Length of the effect.'),
     '#default_value' => isset($menu_minipanels_hover['hide']['effect']['length']) ? $menu_minipanels_hover['hide']['effect']['length'] : $defaults['hide']['effect']['length'],
     '#required' => FALSE,
   );
@@ -516,16 +523,16 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   );
   $base_form['menu_minipanels_hover']['style'] = array();
   $options_style = array(
-    'cream' => 'Cream',
-    'light' => 'Light',
-    'dark' => 'Dark',
-    'green' => 'Green',
-    'red' => 'Red',
+    'cream' => t('Cream'),
+    'light' => t('Light'),
+    'dark' => t('Dark'),
+    'green' => t('Green'),
+    'red' => t('Red'),
   );
   $base_form['menu_minipanels_hover']['style']['name'] = array(
     '#type' => 'select',
     '#title' => t('Style name'),
-    '#description' => t('The name of the style to apply'),
+    '#description' => t('The name of the style to apply.'),
     '#default_value' => isset($menu_minipanels_hover['style']['name']) ? $menu_minipanels_hover['style']['name'] : $defaults['style']['name'],
     '#options' => $options_style,
     '#required' => FALSE,
@@ -535,7 +542,7 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['style']['width']['min'] = array(
     '#type' => 'textfield',
     '#title' => t('Style / Width / Min width'),
-    '#description' => t('Minimum width of the tooltip in pixels (excl. px)'),
+    '#description' => t('Minimum width of the tooltip in pixels (excl. px).'),
     '#default_value' => isset($menu_minipanels_hover['style']['width']['min']) ? $menu_minipanels_hover['style']['width']['min'] : $defaults['style']['width']['min'],
     '#required' => FALSE,
   );
@@ -543,7 +550,7 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['style']['width']['max'] = array(
     '#type' => 'textfield',
     '#title' => t('Style / Width / Max width'),
-    '#description' => t('Maximum width of the tooltip in pixels (excl. px)'),
+    '#description' => t('Maximum width of the tooltip in pixels (excl. px).'),
     '#default_value' => isset($menu_minipanels_hover['style']['width']['max']) ? $menu_minipanels_hover['style']['width']['max'] : $defaults['style']['width']['max'],
     '#required' => FALSE,
   );
@@ -552,7 +559,7 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['style']['border']['width'] = array(
     '#type' => 'textfield',
     '#title' => t('Style / Border / Width'),
-    '#description' => t('Witdth of the border in pixels (excl. px)'),
+    '#description' => t('Witdth of the border in pixels (excl. px).'),
     '#default_value' => isset($menu_minipanels_hover['style']['border']['width']) ? $menu_minipanels_hover['style']['border']['width'] : $defaults['style']['border']['width'],
     '#required' => FALSE,
   );
@@ -560,7 +567,7 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['style']['border']['color'] = array(
     '#type' => 'textfield',
     '#title' => t('Style / Border / Color'),
-    '#description' => t('Color of the border. Incl. #'),
+    '#description' => t('Color of the border. Incl. #.'),
     '#default_value' => isset($menu_minipanels_hover['style']['border']['color']) ? $menu_minipanels_hover['style']['border']['color'] : $defaults['style']['border']['color'],
     '#required' => FALSE,
   );
@@ -568,7 +575,7 @@ function _menu_minipanels_hover_settings_form(&$base_form, $menu_minipanels_hove
   $base_form['menu_minipanels_hover']['style']['border']['radius'] = array(
     '#type' => 'textfield',
     '#title' => t('Style / Border / Radius'),
-    '#description' => t('Determines the roundness of the tooltip border'),
+    '#description' => t('Determines the roundness of the tooltip border.'),
     '#default_value' => isset($menu_minipanels_hover['style']['border']['radius']) ? $menu_minipanels_hover['style']['border']['radius'] : $defaults['style']['border']['radius'],
     '#required' => FALSE,
   );
